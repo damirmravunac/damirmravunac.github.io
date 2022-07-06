@@ -9,3 +9,4 @@ layout: page
 > damir.mravunac@gmail.com
 
 
+![ja](assets/51086426.jpg)
