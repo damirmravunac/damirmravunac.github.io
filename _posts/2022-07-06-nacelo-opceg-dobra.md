@@ -1,0 +1,10 @@
+---
+layout: post
+title:  "Što li je to načelo općeg dobra"
+tag: SNC
+---
+
+## Samo su tri riječi problematične
+
+Ako razjasnimo samo te tri riječi sve će biti puno jasnije.  Dakle, meni nije jasno što bi to bilo "dobro", što bi što se misli pod "općim" (ili "općim dobrom") i što znači da je nešto "načelo". 
+
