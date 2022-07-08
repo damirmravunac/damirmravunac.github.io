@@ -1,7 +1,7 @@
 title: "Damir Mravunac - blog"
 author: "Damir Mravunac"
 # description: "Made with <b style=\"color: #f45;\">&lt;3</b>"
-permalink: /:title/
+# permalink: /:name/
 lang: "hr"
 excerpt_separator: "\n\n\n"
 date_format: "%-d. %-m. %Y."
