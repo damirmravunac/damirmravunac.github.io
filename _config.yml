@@ -4,7 +4,7 @@ author: "Damir Mravunac"
 permalink: /:title/
 lang: "hr"
 excerpt_separator: "\n\n\n"
-date_format: "%-d %-m %Y"
+date_format: "%-d. %-m. %Y."
 paginate: 5
 paginate_path: /page/:num/
 
