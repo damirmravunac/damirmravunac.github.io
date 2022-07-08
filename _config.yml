@@ -1,10 +1,10 @@
 title: "Damir Mravunac - blog"
 author: "Damir Mravunac"
-description: "Made with <b style=\"color: #f45;\">&lt;3</b>"
+# description: "Made with <b style=\"color: #f45;\">&lt;3</b>"
 permalink: /:title/
 lang: "hr"
 excerpt_separator: "\n\n\n"
-date_format: "%-d %-m, %Y"
+date_format: "%-d %-m %Y"
 paginate: 5
 paginate_path: /page/:num/
 
