@@ -1,6 +1,7 @@
 ---
 layout: post
 title:  "Što li je to načelo općeg dobra"
+posted: 2022-07-06
 tag: SNC
 ---
 

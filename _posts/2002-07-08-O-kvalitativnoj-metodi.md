@@ -1,6 +1,7 @@
 ---
 layout: post
 title:  "Kakva je sudbina kvalitativnog istraživača?"
+posted: 2022-07-08
 tag: Kvalitativa
 ---
 
