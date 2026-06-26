@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="hr">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Oblak riječi uživo — Kulturna sociologija i snovi</title>
+        <style>
+            :root {
+                --navy: #1e2247;
+                --gold: #e6b450;
+                --lav: #aeb4f2;
+            }
+            html,
+            body {
+                margin: 0;
+                height: 100%;
+                background: var(--navy);
+                color: #fff;
+                font-family: "Segoe UI", Calibri, Arial, sans-serif;
+                overflow: hidden;
+            }
+            header {
+                display: flex;
+                align-items: baseline;
+                justify-content: space-between;
+                padding: 18px 28px 6px;
+            }
+            h1 {
+                font-size: 22px;
+                font-weight: 600;
+                margin: 0;
+                color: #fff;
+            }
+            h1 span {
+                color: var(--gold);
+            }
+            #meta {
+                font-size: 14px;
+                color: var(--lav);
+            }
+            #wrap {
+                height: calc(100% - 70px);
+                width: 100%;
+            }
+            #cloud {
+                width: 100%;
+                height: 100%;
+                display: block;
+            }
+            #msg {
+                position: absolute;
+                top: 50%;
+                left: 0;
+                right: 0;
+                transform: translateY(-50%);
+                text-align: center;
+                color: var(--lav);
+                font-size: 20px;
+                padding: 0 40px;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>
+                Da znate da ne možete promašiti —
+                <span>što biste sanjali?</span>
+            </h1>
+            <div id="meta">odgovora: 0 · osvježeno: —</div>
+        </header>
+        <div id="wrap"><canvas id="cloud"></canvas></div>
+        <div id="msg">
+            Učitavanje… provjeri je li CSV URL ispravno zalijepljen.
+        </div>
+
+        <script>
+            /* ======================= PODESI OVDJE ======================= */
+            const CONFIG = {
+                // 1) Zalijepi URL objavljenog CSV-a (Datoteka → Dijeli → Objavi na webu → CSV):
+                CSV_URL:
+                    "https://docs.google.com/spreadsheets/d/e/2PACX-1vT-6qX-hZAoq2GjE1Jk90GqH9aoUknS42AvNOePJhi3ky9vRa4ta_PHksgQ_bKJF17KfFnMey3pfvYR/pub?gid=1162133431&single=true&output=csv",
+                // 2) Koliko često osvježavati (u sekundama):
+                REFRESH_SECONDS: 5,
+                // 3) Po kojem se nazivu stupca prepoznaje pitanje (dovoljan je dio teksta).
+                //    Ostavi prazno ("") da se uzme zadnji stupac koji nije vrijeme/e-pošta.
+                COLUMN_MATCH: "sanjal",
+                // 4) Najmanja dužina riječi koja se prikazuje:
+                MIN_LEN: 3,
+            };
+            /* =========================================================== */
+
+            const STOP = new Set(
+                (
+                    "i ili a ali pa te da li ne ne'mam je su sam si smo ste bih bi bismo " +
+                    "biste će ću ćeš ćemo ćete se što koji koja koje kojih kojem kao na u o od do za s sa iz po " +
+                    "pri kroz uz niz mi ti on ona ono vi oni one moj moja moje mojih svoj svoja svoje tvoj njegov " +
+                    "njezin naš vaš jedan jedna jedno jednu jednom samo vrlo jako baš već još kad kada gdje kako " +
+                    "zašto jer ovaj ova ovo taj ta to onaj neki neka neko nešto netko ništa nitko sve svi sva " +
+                    "svaki bila bio bili bile biti ima imati nije bez ako pa to su ja te the my to of and or a an " +
+                    "in on at is are was were be to for with my i'd"
+                ).split(/\s+/),
+            );
+
+            const canvas = document.getElementById("cloud");
+            const meta = document.getElementById("meta");
+            const msg = document.getElementById("msg");
+
+            function sizeCanvas() {
+                const w = document.getElementById("wrap");
+                canvas.width = w.clientWidth;
+                canvas.height = w.clientHeight;
+            }
+            window.addEventListener("resize", () => {
+                sizeCanvas();
+                render(lastList);
+            });
+
+            /* --- minimalan CSV parser (podržava navodnike i zareze u poljima) --- */
+            function parseCSV(text) {
+                const rows = [];
+                let row = [],
+                    field = "",
+                    q = false;
+                for (let i = 0; i < text.length; i++) {
+                    const c = text[i];
+                    if (q) {
+                        if (c === '"') {
+                            if (text[i + 1] === '"') {
+                                field += '"';
+                                i++;
+                            } else q = false;
+                        } else field += c;
+                    } else {
+                        if (c === '"') q = true;
+                        else if (c === ",") {
+                            row.push(field);
+                            field = "";
+                        } else if (c === "\n") {
+                            row.push(field);
+                            rows.push(row);
+                            row = [];
+                            field = "";
+                        } else if (c === "\r") {
+                            /* preskoči */
+                        } else field += c;
+                    }
+                }
+                if (field.length || row.length) {
+                    row.push(field);
+                    rows.push(row);
+                }
+                return rows;
+            }
+
+            function pickColumn(header) {
+                const lower = header.map((h) => h.toLowerCase());
+                if (CONFIG.COLUMN_MATCH) {
+                    const idx = lower.findIndex((h) =>
+                        h.includes(CONFIG.COLUMN_MATCH.toLowerCase()),
+                    );
+                    if (idx >= 0) return idx;
+                }
+                // inače zadnji stupac koji nije vrijeme/e-pošta
+                for (let i = lower.length - 1; i >= 0; i--) {
+                    if (!/timestamp|vremensk|e-?mail|e-?po[sš]t/.test(lower[i]))
+                        return i;
+                }
+                return header.length - 1;
+            }
+
+            function tokenize(sentences) {
+                const counts = {};
+                sentences.forEach((s) => {
+                    s.toLowerCase()
+                        .replace(/[„”"'`.,;:!?()\[\]{}…—–\-\/\\»«]/g, " ")
+                        .split(/\s+/)
+                        .forEach((w) => {
+                            w = w.trim();
+                            if (
+                                w.length >= CONFIG.MIN_LEN &&
+                                !STOP.has(w) &&
+                                !/^\d+$/.test(w)
+                            ) {
+                                counts[w] = (counts[w] || 0) + 1;
+                            }
+                        });
+                });
+                return Object.entries(counts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 120);
+            }
+
+            let lastList = [];
+            function render(list) {
+                lastList = list;
+                if (!list.length) return;
+                sizeCanvas();
+                const max = list[0][1];
+                const base = Math.max(canvas.width, canvas.height);
+                WordCloud(canvas, {
+                    list: list,
+                    gridSize: Math.round((8 * base) / 1024),
+                    weightFactor: (w) => (14 + (w / max) * 72) * (base / 1024),
+                    fontFamily: "Calibri, Segoe UI, Arial, sans-serif",
+                    color: (word, weight) => {
+                        const t = weight / max;
+                        return t > 0.66
+                            ? "#E6B450"
+                            : t > 0.33
+                              ? "#AEB4F2"
+                              : "#8E93C0";
+                    },
+                    backgroundColor: "#1E2247",
+                    rotateRatio: 0.3,
+                    rotationSteps: 2,
+                    shrinkToFit: true,
+                    drawOutOfBound: false,
+                });
+            }
+
+            async function refresh() {
+                if (!CONFIG.CSV_URL || CONFIG.CSV_URL.startsWith("OVDJE")) {
+                    msg.textContent =
+                        "Zalijepi CSV URL u CONFIG.CSV_URL na vrhu datoteke.";
+                    return;
+                }
+                try {
+                    const url =
+                        CONFIG.CSV_URL +
+                        (CONFIG.CSV_URL.includes("?") ? "&" : "?") +
+                        "t=" +
+                        Date.now();
+                    const res = await fetch(url, { cache: "no-store" });
+                    const text = await res.text();
+                    const rows = parseCSV(text).filter(
+                        (r) => r.length > 1 || (r.length === 1 && r[0].trim()),
+                    );
+                    if (rows.length < 2) {
+                        msg.textContent = "Još nema odgovora…";
+                        return;
+                    }
+                    const header = rows[0];
+                    const col = pickColumn(header);
+                    const answers = rows
+                        .slice(1)
+                        .map((r) => r[col] || "")
+                        .filter((s) => s.trim());
+                    const list = tokenize(answers);
+                    msg.style.display = list.length ? "none" : "block";
+                    if (!list.length) msg.textContent = "Još nema odgovora…";
+                    meta.textContent = `odgovora: ${answers.length} · osvježeno: ${new Date().toLocaleTimeString("hr-HR")}`;
+                    render(list);
+                } catch (e) {
+                    msg.style.display = "block";
+                    msg.textContent =
+                        "Greška pri dohvaćanju (provjeri URL i da je tablica objavljena na webu): " +
+                        e.message;
+                }
+            }
+
+            /* učitaj wordcloud2.js (jsDelivr, pa rezerva unpkg), zatim pokreni */
+            function start() {
+                sizeCanvas();
+                refresh();
+                setInterval(refresh, CONFIG.REFRESH_SECONDS * 1000);
+            }
+            function loadLib(srcs) {
+                if (!srcs.length) {
+                    msg.textContent =
+                        "Nije moguće učitati biblioteku za oblak (provjeri internet).";
+                    return;
+                }
+                const s = document.createElement("script");
+                s.src = srcs[0];
+                s.onload = start;
+                s.onerror = () => loadLib(srcs.slice(1));
+                document.head.appendChild(s);
+            }
+            loadLib([
+                "https://cdn.jsdelivr.net/npm/wordcloud@1.2.3/src/wordcloud2.js",
+                "https://unpkg.com/wordcloud@1.2.3/src/wordcloud2.js",
+                "https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js",
+            ]);
+        </script>
+    </body>
+</html>
